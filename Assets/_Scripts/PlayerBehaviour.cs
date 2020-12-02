@@ -3,6 +3,21 @@ using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Cinemachine;
+
+
+
+public enum Sounds
+{
+    JUMP,
+    HIT1,
+    HTI2,
+    HIT3,
+    DIE
+}
+
+
+
 
 public class PlayerBehaviour : MonoBehaviour
 {
@@ -31,7 +46,21 @@ public class PlayerBehaviour : MonoBehaviour
 
     [Header("Dust Trail")]
     private ParticleSystem DustTrail;
-     
+    
+    [Header("Sounds")]
+    public AudioSource[] SFX;
+
+    [Header("Camera Shake")]
+    public CinemachineVirtualCamera vcam1;
+    public Cinemachine.CinemachineBasicMultiChannelPerlin perlin;
+    public float ShakeIntensity;
+    public float MaxShakeTime;
+    public float ShakeTimer;
+    public bool isCameraShaking;
+
+
+
+
 
 
     [Header("Player Abilities")] 
@@ -50,6 +79,10 @@ public class PlayerBehaviour : MonoBehaviour
     {
         health = 100;
         lives = 3;
+        ShakeIntensity = 5.0f;
+        isCameraShaking = false;
+        ShakeTimer = MaxShakeTime;
+
 
         m_rigidBody2D = GetComponent<Rigidbody2D>();
         m_spriteRenderer = GetComponent<SpriteRenderer>();
@@ -59,6 +92,12 @@ public class PlayerBehaviour : MonoBehaviour
 
 
         DustTrail = GetComponentInChildren<ParticleSystem>();
+        SFX = GetComponents<AudioSource>();
+        vcam1 = FindObjectOfType<CinemachineVirtualCamera>();
+        perlin = vcam1.GetCinemachineComponent<CinemachineBasicMultiChannelPerlin>();
+
+
+
     }
 
     // Update is called once per frame
@@ -67,6 +106,20 @@ public class PlayerBehaviour : MonoBehaviour
         _LookInFront();
         _LookAhead();
         _Move();
+    
+    
+
+        if (isCameraShaking)
+        {
+            ShakeTimer -= Time.deltaTime;
+            // Time up
+            if (ShakeTimer <= 0.0f)
+            {
+                perlin.m_AmplitudeGain = 0.0f;
+                ShakeTimer = MaxShakeTime;
+                isCameraShaking = false;
+            }
+        }
     }
 
     private void _LookInFront()
@@ -125,6 +178,7 @@ public class PlayerBehaviour : MonoBehaviour
             {
                 if (joystick.Horizontal > joystickHorizontalSensitivity)
                 {
+
                     // move right
                     m_rigidBody2D.AddForce(Vector2.right * horizontalForce * Time.deltaTime);
                     transform.localScale = new Vector3(1.0f, 1.0f, 1.0f);
@@ -160,7 +214,7 @@ public class PlayerBehaviour : MonoBehaviour
                 else
                 {
                     m_animator.SetInteger("AnimState", (int)PlayerAnimationType.IDLE);
-                    StopDustTrail();
+
                 }
             }
 
@@ -170,12 +224,14 @@ public class PlayerBehaviour : MonoBehaviour
                 m_rigidBody2D.AddForce(Vector2.up * verticalForce);
                 m_animator.SetInteger("AnimState", (int) PlayerAnimationType.JUMP);
                 isJumping = true;
+                
 
+
+                SFX[(int)Sounds.JUMP].Play();
                 CreateDustTrail();
             }
             else
             {
-                StopDustTrail();
                 isJumping = false;
             }
 
@@ -227,6 +283,11 @@ public class PlayerBehaviour : MonoBehaviour
     {
         lives -= 1;
 
+        // Sound
+        SFX[(int)Sounds.DIE].Play();
+        // Shake Camera
+        ShakeCamera();
+
         livesHUD.SetInteger("LivesState", lives);
 
         if (lives > 0)
@@ -246,6 +307,10 @@ public class PlayerBehaviour : MonoBehaviour
     {
         health -= damage;
         healthBar.SetValue(health);
+        PlayRandomHitSound();
+
+        ShakeCamera();
+
 
         if (health <= 0)
         {
@@ -258,9 +323,18 @@ public class PlayerBehaviour : MonoBehaviour
         DustTrail.Play();
     }
 
-    private void StopDustTrail()
+
+    private void PlayRandomHitSound()
     {
-        // DustTrail.Pause();
+        var RandHitSound = UnityEngine.Random.Range(1,3);
+        SFX[RandHitSound].Play();
     }
 
+
+
+    private void ShakeCamera()
+    {
+        perlin.m_AmplitudeGain = ShakeIntensity;
+        isCameraShaking = true;
+    }
 }
